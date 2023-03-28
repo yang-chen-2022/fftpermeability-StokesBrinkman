@@ -9,4 +9,4 @@ FFT solvers for predicting the permeability of porous media
   Yang Chen, "High-performance computational homogenization of Stokes-Brinkman flow with an Anderson-accelerated FFT method.", Iinternational Journal of Numerical Methods in Fluids
   
  
-
+### A Fortran implementation is available upon request. 
