@@ -7,7 +7,7 @@ FFT solvers for predicting the permeability of porous media
 
 # how to run examples
     make sure you are in the root directory
-    run *python\ -m\ examples.parallelChannel_
+    run *python\ -m\ examples.parallelChannel*
     run _{python -m examples.parallelChannel}_
  
 ## Please cite:
