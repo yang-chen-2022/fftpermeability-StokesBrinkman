@@ -6,8 +6,8 @@ FFT solvers for predicting the permeability of porous media
 * Anderson acceleration
 
 # how to run examples
-    make sure you are in the root directory
-    run _python_ _-m_ _examples.parallelChannel_
+    make sure you are in the root directory, then type
+    python -m examples.parallelChannel
 
  
 ## Please cite:
