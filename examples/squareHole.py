@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.classes import microstructure, load_fluid_condition, param_algo
-from utils.brinkman_mod import *
-from utils.math_fcts import *
+from utils_torch.classes import microstructure, load_fluid_condition, param_algo
+from utils_torch.brinkman_mod import *
+from utils_torch.math_fcts import *
 
 import time
 import tracemalloc
@@ -79,20 +79,20 @@ l0 = load_fluid_condition(      macro_load = [1,0,0],     #macro velocity
 ############################
 # p0.cv_acc = False
 # tracemalloc.start()
-# H1, vfield1, gmacro1 = brinkman_fft_solver_stress(m0, l0, p0, freqType='classical', freqLaplacian='classical')
+# H1, vfield1, gmacro1 = brinkman_fft_solver_stress(m0, l0, p0, freqType='modified', freqLaplacian='classical')
 # K1 = 1./H1[0]
 # current, peak = tracemalloc.get_traced_memory()
-# print(f"Algo1: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
+# print(f"\nAlgo1: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
 # tracemalloc.stop()
 
 p0.cv_acc = True
 p0.AA_depth = 8
 p0.AA_increment = 4
 tracemalloc.start()
-H2, vfield2, gmacro2 = brinkman_fft_solver_velocity(m0, l0, p0, freqType='classical', freqLaplacian='classical')
+H2, vfield2, gmacro2 = brinkman_fft_solver_velocity(m0, l0, p0, freqType='modified', freqLaplacian='classical')
 K2 = 1./H2[0]
 current, peak = tracemalloc.get_traced_memory()
-print(f"Algo2: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
+print(f"\nAlgo2: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
 tracemalloc.stop()
 
 
@@ -101,10 +101,10 @@ p0.AA_depth = 8
 p0.AA_increment = 8
 l0.macro_load = [-1,0,0]
 tracemalloc.start()
-K3, vfield3, vmacro3 = brinkman_fft_solver_velocityP(m0, l0, p0, freqType='classical', freqLaplacian='classical')
+K3, vfield3, vmacro3 = brinkman_fft_solver_velocityP(m0, l0, p0, freqType='modified', freqLaplacian='classical')
 K3 = K3[0]
 current, peak = tracemalloc.get_traced_memory()
-print(f"Algo3: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
+print(f"\nAlgo3: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
 tracemalloc.stop()    
     
 # print('K1, K2, K3: %.12e, %.12e, %.12e'%(K1, K2, K3))

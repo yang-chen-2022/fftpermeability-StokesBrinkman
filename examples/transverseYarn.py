@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.classes import microstructure, load_fluid_condition, param_algo
-from utils.brinkman_mod import *
-from utils.math_fcts import *
+from utils_torch.classes import microstructure, load_fluid_condition, param_algo
+from utils_torch.brinkman_mod import *
+from utils_torch.math_fcts import *
 
 import time
 import tracemalloc
@@ -166,12 +166,12 @@ for J in lst_J:
 
     tracemalloc.start()
     
-    H, vfield, gmacro = brinkman_fft_solver_stress(m0, l0, p0, freqType='classical', freqLaplacian='classical')
-    # H, vfield, gmacro = brinkman_fft_solver_velocity(m0, l0, p0, freqType='classical', freqLaplacian='classical')
-    # K, vfield, vmacro = brinkman_fft_solver_velocityP(m0, l0, p0, freqType='classical', freqLaplacian='classical')
+    # H, vfield, gmacro = brinkman_fft_solver_stress(m0, l0, p0, freqType='modified', freqLaplacian='classical')
+    H, vfield, gmacro = brinkman_fft_solver_velocity(m0, l0, p0, freqType='modified', freqLaplacian='classical')
+    K, vfield, vmacro = brinkman_fft_solver_velocityP(m0, l0, p0, freqType='modified', freqLaplacian='classical')
     
     current, peak = tracemalloc.get_traced_memory()
-    print(f"Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
+    print(f"Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB\n")
     tracemalloc.stop()
 
 
@@ -183,4 +183,4 @@ for J in lst_J:
     
 
 Ktensor = np.linalg.inv(Htensor)
-print('Normalised permeability K/(ab): \n', str(Ktensor/a[0]/b[0]))
+print('Normalised permeability K/(ab): \n\n', str(Ktensor/a[0]/b[0]))

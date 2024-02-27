@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.classes import microstructure, load_fluid_condition, param_algo
-from utils.brinkman_mod import *
-from utils.math_fcts import *
+from utils_torch.classes import microstructure, load_fluid_condition, param_algo
+from utils_torch.brinkman_mod import *
+from utils_torch.math_fcts import *
 
 import time
 import tracemalloc
@@ -76,7 +76,7 @@ p0 = param_algo(   cv_criterion = 1e-6,           #convergence criterion
                  reference_phi0 = phi0,
                 reference_beta0 = beta0,
                           itMax = 10000,           #max number of iterations
-                         cv_acc = False,
+                         cv_acc = True,
                        AA_depth = 10
                 )
 
@@ -101,7 +101,7 @@ p0.cv_acc = True
 p0.AA_depth = 10
 H2, vfield2, gmacro2 = brinkman_fft_solver_velocity(m0, l0, p0, freqType='modified', freqLaplacian='classical')
 current, peak = tracemalloc.get_traced_memory()
-print(f"Algo2: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
+print(f"\nAlgo2: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
 tracemalloc.stop()
 
 tracemalloc.start()
@@ -110,7 +110,7 @@ p0.cv_acc = True
 p0.AA_depth = 10
 K3, vfield3, vmacro3 = brinkman_fft_solver_velocityP(m0, l0, p0, freqType='modified', freqLaplacian='classical')
 current, peak = tracemalloc.get_traced_memory()
-print(f"Algo3: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
+print(f"\nAlgo3: Current memory usage is {current / 10**6} MB; Peak was {peak / 10**6} MB")
 tracemalloc.stop()
 
 
@@ -160,3 +160,4 @@ ax.xaxis.set_ticks((1e-6,1e-5,1e-4,1e-3)) #ks=1e-6
 # ax.xaxis.set_ticks((1e-4,1e-3)) #ks=1e-4
 # ax.xaxis.set_ticks((1e-8,1e-6,1e-4)) #ks=1e-8
 
+plt.show()
