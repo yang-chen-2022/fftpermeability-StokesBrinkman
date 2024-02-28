@@ -5,6 +5,8 @@ FFT solvers for predicting the permeability of porous media
 * Fixed-point iterative algorithm
 * Anderson acceleration
 
+* New implementation with PyTorch for GPU acceleration. Even witout GPU, the torch implementation performs better with CPU parallisation.
+  
 # how to run examples
     make sure you are in the root directory, then type
     python -m examples.parallelChannel
