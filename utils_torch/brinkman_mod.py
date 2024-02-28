@@ -108,10 +108,6 @@ def brinkman_fft_solver_velocity( m0,  # microstructure
     tauF    = torch.zeros((m0.nx,m0.ny,m0.nz, 3), dtype=torch.complex128).to(device)
     vfield  = torch.zeros((m0.nx, m0.ny, m0.nz, 3)).to(device)
     vfieldF = torch.zeros((m0.nx,m0.ny,m0.nz, 3), dtype=torch.complex128).to(device)
-    
-    #gmaF    = torch.zeros((m0.nx,m0.ny,m0.nz, 3), dtype=torch.complex128).to(device)
-    #residu  = torch.zeros((m0.nx, m0.ny, m0.nz, 3)).to(device)
-    #residuF = torch.zeros((m0.nx,m0.ny,m0.nz, 3), dtype=torch.complex128).to(device)
 
     # initialisation: velocity field, laplacian of velocity
     for j0 in range(3):
@@ -173,11 +169,9 @@ def brinkman_fft_solver_velocity( m0,  # microstructure
         vfieldF[0,0,0,1] = vmacro[1] * g0.ntot
         vfieldF[0,0,0,2] = vmacro[2] * g0.ntot
         
-        
         # IFFT
         for j0 in range(3):
             vfield[:,:,:,j0] = ifftn(vfieldF[:,:,:,j0]).real
-            #gma[:,:,:,j0]  = ifftn(-freqSquare* vfieldF[:,:,:,j0]).real
             
         # Anderson's acceleration
         if p0.cv_acc==True:
@@ -186,23 +180,11 @@ def brinkman_fft_solver_velocity( m0,  # microstructure
             # if iters % p0.AA_depth ==0:
             if iters % p0.AA_increment ==0:
                 vfield = AAcceleration(act_R, act_U)
-                ##update gamam with new vfield
-                #for j0 in range(3):
-                #    gma[:,:,:,j0]  = ifftn(-freqSquare* fftn(vfield[:,:,:,j0])).real
-            #else:
-            #    #update gamma with vfieldF
-            #    for j0 in range(3):
-            #        gma[:,:,:,j0]  = ifftn(-freqSquare* vfieldF[:,:,:,j0]).real
                 
             if iters % p0.AA_depth == 0:
                 iact = 0
             else:
                 iact += 1
-        #else:
-        #    #update gamma with vfieldF
-        #    for j0 in range(3):
-        #        gma[:,:,:,j0]  = ifftn(-freqSquare* vfieldF[:,:,:,j0]).real
-                
         
         # convergence check
         if p0.cv_acc==True:
@@ -228,7 +210,7 @@ def brinkman_fft_solver_velocity( m0,  # microstructure
             # Polarisation vector  (at iteration k-1)
             tau = torch.zeros_like(gma)
             for j0 in range(3):
-                tau[...,j0] = ifftn(tauF[...,j0])
+                tau[...,j0] = ifftn(tauF[...,j0]).real
             
             # Laplacien of velocity (at iteration k)
             for j0 in range(3):
@@ -518,7 +500,7 @@ def brinkman_fft_solver_velocityP( m0,  # microstructure
             # Polarisation vector  (at iteration k-1)
             tau = torch.zeros_like(gma)
             for j0 in range(3):
-                tau[...,j0] = ifftn(tauF[...,j0])
+                tau[...,j0] = ifftn(tauF[...,j0]).real
             
             # Laplacien of velocity (at iteration k)
             for j0 in range(3):
