@@ -177,7 +177,7 @@ def brinkman_fft_solver_velocity( m0,  # microstructure
         # IFFT
         for j0 in range(3):
             vfield[:,:,:,j0] = ifftn(vfieldF[:,:,:,j0]).real
-            gma[:,:,:,j0]  = ifftn(-freqSquare* vfieldF[:,:,:,j0]).real
+            #gma[:,:,:,j0]  = ifftn(-freqSquare* vfieldF[:,:,:,j0]).real
             
         # Anderson's acceleration
         if p0.cv_acc==True:
@@ -185,13 +185,23 @@ def brinkman_fft_solver_velocity( m0,  # microstructure
             
             # if iters % p0.AA_depth ==0:
             if iters % p0.AA_increment ==0:
-                # vfield = jit_AAcceleration(act_R, act_U)
                 vfield = AAcceleration(act_R, act_U)
+                ##update gamam with new vfield
+                #for j0 in range(3):
+                #    gma[:,:,:,j0]  = ifftn(-freqSquare* fftn(vfield[:,:,:,j0])).real
+            #else:
+            #    #update gamma with vfieldF
+            #    for j0 in range(3):
+            #        gma[:,:,:,j0]  = ifftn(-freqSquare* vfieldF[:,:,:,j0]).real
                 
             if iters % p0.AA_depth == 0:
                 iact = 0
             else:
                 iact += 1
+        #else:
+        #    #update gamma with vfieldF
+        #    for j0 in range(3):
+        #        gma[:,:,:,j0]  = ifftn(-freqSquare* vfieldF[:,:,:,j0]).real
                 
         
         # convergence check
@@ -211,64 +221,57 @@ def brinkman_fft_solver_velocity( m0,  # microstructure
             test = test / torch.sqrt(torch.sum(vmacro**2))
         
         
-        '''
-        # convergence check (pde residual)
-        
-        #residual in Fourier space
-        gma[:,:,:,0] = (phi-phi0)*gma[:,:,:,0] - ((beta[:,:,:,0]-beta0)*vfield[:,:,:,0] + \
-                                                   beta[:,:,:,3]*vfield[:,:,:,1] + \
-                                                   beta[:,:,:,4]*vfield[:,:,:,2] )
-        gma[:,:,:,1] = (phi-phi0)*gma[:,:,:,1] - ( beta[:,:,:,3]*vfield[:,:,:,0] + \
-                                                  (beta[:,:,:,1]-beta0)*vfield[:,:,:,1] + \
-                                                   beta[:,:,:,5]*vfield[:,:,:,2] )
-        gma[:,:,:,2] = (phi-phi0)*gma[:,:,:,2] - ( beta[:,:,:,4]*vfield[:,:,:,0] + \
-                                                   beta[:,:,:,5]*vfield[:,:,:,1] + \
-                                                  (beta[:,:,:,2]-beta0)*vfield[:,:,:,2] )
-        for j0 in range(3):
-            vfieldF[:,:,:,j0] = fftn(vfield[:,:,:,j0])
-            gmaF[:,:,:,j0] = fftn(gma[:,:,:,j0])
-        for j0 in range(3):
-            residuF[:,:,:,j0] = (phi0*freqSquare + beta0) * vfieldF[:,:,:,j0] - gmaF[:,:,:,j0] + tauF[:,:,:,j0]
-        for j0 in range(3):
-            residu[:,:,:,j0] = ifftn(residuF[:,:,:,j0]).real
-        test =  torch.sqrt( torch.sum(residu[:,:,:,0]**2 + 
-                                        residu[:,:,:,1]**2 + 
-                                        residu[:,:,:,2]**2).flatten() ) / g0.ntot
-        print(test)
-        '''
-        
-        
-        if p0.cv_acc==True:
-            # if iters % p0.AA_depth == 0:
-            if iters % p0.AA_increment == 0:
-                pass #Force to do an additional iteration
-            else:
-                test = torch.sqrt( torch.sum((act_R[:,:,:,0,iact-1]**2 +
-                                              act_R[:,:,:,1,iact-1]**2 +
-                                              act_R[:,:,:,2,iact-1]**2).flatten())/g0.ntot )
-                test = test / torch.sqrt(vmacro[0]**2+vmacro[1]**2+vmacro[2]**2)
-        else:
-            test = torch.sqrt(torch.sum( ((vfield[:,:,:,0]-vfield0[:,:,:,0])**2 +
-                                          (vfield[:,:,:,1]-vfield0[:,:,:,1])**2 +
-                                          (vfield[:,:,:,2]-vfield0[:,:,:,2])**2).flatten())/g0.ntot )
-            test = test / torch.sqrt(torch.sum(vmacro**2))
+        # pde residual: 
+        #   R = (phi0*gma_{k} - beta0*vfield_{k} - pfield_{k} + tau_{k-1}) / ||Gmacro||_2
+        test_eq = np.nan
+        if iters%1==0:
+            # Polarisation vector  (at iteration k-1)
+            tau = torch.zeros_like(gma)
+            for j0 in range(3):
+                tau[...,j0] = ifftn(tauF[...,j0])
             
+            # Laplacien of velocity (at iteration k)
+            for j0 in range(3):
+                gma[:,:,:,j0]  = ifftn(-freqSquare* fftn(vfield[:,:,:,j0])).real
+            
+            # pressure gradient field (at iteration k)
+            pfield = torch.zeros_like(vfield)
+            pfield[:,:,:,0] = phi*gma[:,:,:,0] - (beta[:,:,:,0]*vfield[:,:,:,0] + \
+                                                  beta[:,:,:,3]*vfield[:,:,:,1] + \
+                                                  beta[:,:,:,4]*vfield[:,:,:,2])
+            pfield[:,:,:,1] = phi*gma[:,:,:,1] - (beta[:,:,:,3]*vfield[:,:,:,0] + \
+                                                  beta[:,:,:,1]*vfield[:,:,:,1] + \
+                                                  beta[:,:,:,5]*vfield[:,:,:,2])
+            pfield[:,:,:,2] = phi*gma[:,:,:,2] - (beta[:,:,:,4]*vfield[:,:,:,0] + \
+                                                  beta[:,:,:,5]*vfield[:,:,:,1] + \
+                                                  beta[:,:,:,2]*vfield[:,:,:,2])
+            # macro pressure gradient
+            W = torch.as_tensor((pfield[...,0].mean(), pfield[...,1].mean(), pfield[...,2].mean()))
+                                   
+            # equilibrium residual
+            eq_residual = phi0*gma - beta0*vfield - pfield + tau
+            test_eq = torch.sqrt( torch.sum((eq_residual[:,:,:,0]**2 + \
+                                             eq_residual[:,:,:,1]**2 + \
+                                             eq_residual[:,:,:,2]**2).flatten())/g0.ntot )
+            test_eq = test_eq / torch.sqrt( torch.sum(W**2) )
         
-        
+            
         # stop ?
         if test<p0.cv_criterion:
+            print('  iteration %d -- residual: U-based (%.3e), E-based (%.3e)'%(iters, test, test_eq))
             break
         
         # counter
         iters += 1
         
         #
-        if (iters % 500)==0:
-            print('  iteration %d -- residual: U-based (%.3e), E-based (%.3e)'%(iters, test, np.nan))
+        if (iters % 100)==0:
+            print('  iteration %d -- residual: U-based (%.3e), E-based (%.3e)'%(iters, test, test_eq))
 
         # to avoid infinite loop
         if iters>p0.itMax:
             print('Warning: number of iterations exceeds limit (%d)'%p0.itMax)
+            print('  iteration %d -- residual: U-based (%.3e), E-based (%.3e)'%(iters, test, test_eq))
             break
 
         # update
@@ -403,7 +406,7 @@ def brinkman_fft_solver_velocityP( m0,  # microstructure
     
     # allocate variables
     gma     = torch.zeros((m0.nx,m0.ny,m0.nz, 3)).to(device)
-    gmaF    = torch.zeros((m0.nx,m0.ny,m0.nz, 3), dtype=torch.complex128).to(device)
+    tauF    = torch.zeros((m0.nx,m0.ny,m0.nz, 3), dtype=torch.complex128).to(device)
     vfield  = torch.zeros((m0.nx, m0.ny, m0.nz, 3)).to(device)
     vfieldF = torch.zeros((m0.nx,m0.ny,m0.nz, 3), dtype=torch.complex128).to(device)
 
@@ -424,7 +427,6 @@ def brinkman_fft_solver_velocityP( m0,  # microstructure
         vfield0 = vfield.clone()
     else:
         vfield = torch.from_numpy(vfield0).to(device).clone()
-    
     
     
     # iterative solution
@@ -448,36 +450,30 @@ def brinkman_fft_solver_velocityP( m0,  # microstructure
                                                    beta[:,:,:,5]*vfield[:,:,:,1] + \
                                                   (beta[:,:,:,2]-beta0)*vfield[:,:,:,2])
         
-        # FFT : store tauF in gmaF
+        # FFT
         for j0 in range(3):
-            gmaF[:,:,:,j0] = fftn(gma[:,:,:,j0])
+            tauF[:,:,:,j0] = fftn(gma[:,:,:,j0])
         
         
         # apply the green operator -> TODO: calculate GG on the fly
-        vfieldF[:,:,:,0] = GG[:,:,:,0]*gmaF[:,:,:,0] + \
-                           GG[:,:,:,3]*gmaF[:,:,:,1] + \
-                           GG[:,:,:,4]*gmaF[:,:,:,2]
-        vfieldF[:,:,:,1] = GG[:,:,:,3]*gmaF[:,:,:,0] + \
-                           GG[:,:,:,1]*gmaF[:,:,:,1] + \
-                           GG[:,:,:,5]*gmaF[:,:,:,2]
-        vfieldF[:,:,:,2] = GG[:,:,:,4]*gmaF[:,:,:,0] + \
-                           GG[:,:,:,5]*gmaF[:,:,:,1] + \
-                           GG[:,:,:,2]*gmaF[:,:,:,2]
+        vfieldF[:,:,:,0] = GG[:,:,:,0]*tauF[:,:,:,0] + \
+                           GG[:,:,:,3]*tauF[:,:,:,1] + \
+                           GG[:,:,:,4]*tauF[:,:,:,2]
+        vfieldF[:,:,:,1] = GG[:,:,:,3]*tauF[:,:,:,0] + \
+                           GG[:,:,:,1]*tauF[:,:,:,1] + \
+                           GG[:,:,:,5]*tauF[:,:,:,2]
+        vfieldF[:,:,:,2] = GG[:,:,:,4]*tauF[:,:,:,0] + \
+                           GG[:,:,:,5]*tauF[:,:,:,1] + \
+                           GG[:,:,:,2]*tauF[:,:,:,2]
             
         # enforce the loading - macro velocity
-        vfieldF[0,0,0,0] = (gmaF[0,0,0,0] - gmacro[0]*g0.ntot) / beta0
-        vfieldF[0,0,0,1] = (gmaF[0,0,0,1] - gmacro[1]*g0.ntot) / beta0
-        vfieldF[0,0,0,2] = (gmaF[0,0,0,2] - gmacro[2]*g0.ntot) / beta0
+        vfieldF[0,0,0,0] = (tauF[0,0,0,0] - gmacro[0]*g0.ntot) / beta0
+        vfieldF[0,0,0,1] = (tauF[0,0,0,1] - gmacro[1]*g0.ntot) / beta0
+        vfieldF[0,0,0,2] = (tauF[0,0,0,2] - gmacro[2]*g0.ntot) / beta0
         
-        # Laplacian of velocity
-        for j0 in range(3):
-            gmaF[:,:,:,j0] = -freqSquare* vfieldF[:,:,:,j0]
-            
         # IFFT
         for j0 in range(3):
             vfield[:,:,:,j0] = ifftn(vfieldF[:,:,:,j0]).real
-            gma[:,:,:,j0]  = ifftn(gmaF[:,:,:,j0]).real
-        
         
         # Anderson's acceleration
         if p0.cv_acc==True:
@@ -485,7 +481,6 @@ def brinkman_fft_solver_velocityP( m0,  # microstructure
             
             # if iters % p0.AA_depth ==0:
             if iters % p0.AA_increment ==0:
-                # vfield = jit_AAcceleration(act_R, act_U)
                 vfield = AAcceleration(act_R, act_U)
                 
             if iters % p0.AA_depth == 0:
@@ -515,19 +510,55 @@ def brinkman_fft_solver_velocityP( m0,  # microstructure
                                           (vfield[:,:,:,2]-vfield0[:,:,:,2])**2).flatten())/g0.ntot )
             test = test / torch.sqrt(torch.sum(vmacro**2))
         
+        
+        # pde residual 
+        #   R = (phi0*gma_{k} - beta0*vfield_{k} - pfield_{k} + tau_{k-1}) / ||Gmacro||_2
+        test_eq = np.nan
+        if iters%1==0:
+            # Polarisation vector  (at iteration k-1)
+            tau = torch.zeros_like(gma)
+            for j0 in range(3):
+                tau[...,j0] = ifftn(tauF[...,j0])
+            
+            # Laplacien of velocity (at iteration k)
+            for j0 in range(3):
+                gma[:,:,:,j0]  = ifftn(-freqSquare* fftn(vfield[:,:,:,j0])).real
+            
+            # pressure gradient field (at iteration k)
+            pfield = torch.zeros_like(vfield)
+            pfield[:,:,:,0] = phi*gma[:,:,:,0] - (beta[:,:,:,0]*vfield[:,:,:,0] + \
+                                                  beta[:,:,:,3]*vfield[:,:,:,1] + \
+                                                  beta[:,:,:,4]*vfield[:,:,:,2])
+            pfield[:,:,:,1] = phi*gma[:,:,:,1] - (beta[:,:,:,3]*vfield[:,:,:,0] + \
+                                                  beta[:,:,:,1]*vfield[:,:,:,1] + \
+                                                  beta[:,:,:,5]*vfield[:,:,:,2])
+            pfield[:,:,:,2] = phi*gma[:,:,:,2] - (beta[:,:,:,4]*vfield[:,:,:,0] + \
+                                                  beta[:,:,:,5]*vfield[:,:,:,1] + \
+                                                  beta[:,:,:,2]*vfield[:,:,:,2])
+                                                  
+            # equilibrium residual
+            eq_residual = phi0*gma - beta0*vfield - pfield + tau
+            test_eq = torch.sqrt( torch.sum((eq_residual[:,:,:,0]**2 + \
+                                             eq_residual[:,:,:,1]**2 + \
+                                             eq_residual[:,:,:,2]**2).flatten())/g0.ntot )
+            test_eq = test_eq / torch.sqrt( torch.sum(gmacro**2) )
+        
+        
         # stop ?
         if test<p0.cv_criterion:
+            print('  iteration %d -- residual: U-based (%.3e), E-based (%.3e)'%(iters, test, test_eq))
             break
         
         # counter
         iters += 1
         
         #
-        if (iters % 500)==0:
-            print('  iteration %d -- residual: U-based (%.3e), E-based (%.3e)'%(iters, test, np.nan))
+        if (iters % 100)==0:
+            print('  iteration %d -- residual: U-based (%.3e), E-based (%.3e)'%(iters, test, test_eq))
 
         # to avoid infinite loop
         if iters>p0.itMax:
+            print('  iteration %d -- residual: U-based (%.3e), E-based (%.3e)'%(iters, test, test_eq))
             print('Warning: number of iterations exceeds limit (%d)'%p0.itMax)
             break
 
@@ -542,7 +573,7 @@ def brinkman_fft_solver_velocityP( m0,  # microstructure
     print('macro permeability K: ', str(K))
     
     #
-    print('residuals: U-based (%.3e),  E-based (%.3e)'%(test, np.nan))
+    print('residuals: U-based (%.3e),  E-based (%.3e)'%(test, test_eq))
     
     #
     print('Total time (%f)s;  Total nb of iters (%d)'%(time.time()-t, iters))
